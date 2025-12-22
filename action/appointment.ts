@@ -39,10 +39,15 @@ export async function getAvailableTimeSlots(doctorId: string) {
     if (!availability) return { error: "No availability set", days: [] };
 
     // 1. Force "Now" to India Time
-    const now = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+  const now = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
     
     // 2. Generate days based on India's current date, not server date
-    const days = [now, addDays(now, 1), addDays(now, 2), addDays(now, 3)];
+    const days = [
+  now, 
+  addDays(now, 1), 
+  addDays(now, 2), 
+  addDays(now, 3)
+];
     const lastDay = endOfDay(days[3]);
 
     const existingAppointments = await prisma.appointment.findMany({
@@ -65,12 +70,12 @@ export async function getAvailableTimeSlots(doctorId: string) {
 
     for (const day of days) {
       // FIX: Ensure the key (YYYY-MM-DD) is generated using India Timezone
-      const dayString = new Intl.DateTimeFormat('en-CA', {
-        timeZone: 'Asia/Kolkata',
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit'
-      }).format(day); 
+     const dayString = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).format(day); 
 
       availableSlotsByDay[dayString] = [];
 
