@@ -38,10 +38,10 @@ export async function getAvailableTimeSlots(doctorId: string) {
 
     if (!availability) return { error: "No availability set", days: [] };
 
-    // 1. Get current time in India
+    // 1. Force "Now" to India Time
     const now = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
     
-    // 2. Ensure we start from the beginning of the day in IST for slot generation
+    // 2. Generate days based on India's current date, not server date
     const days = [now, addDays(now, 1), addDays(now, 2), addDays(now, 3)];
     const lastDay = endOfDay(days[3]);
 
@@ -55,7 +55,6 @@ export async function getAvailableTimeSlots(doctorId: string) {
 
     const availableSlotsByDay: Record<string, any[]> = {};
     
-    // Helper to format time to IST
     const formatIST = (date: Date) => 
       new Intl.DateTimeFormat('en-IN', {
         timeZone: 'Asia/Kolkata',
@@ -64,24 +63,21 @@ export async function getAvailableTimeSlots(doctorId: string) {
         hour12: true
       }).format(date);
 
-    // Helper to get the correct "yyyy-MM-dd" for India
-    const getIndiaDateString = (date: Date) => 
-      new Intl.DateTimeFormat('en-CA', { // en-CA gives yyyy-mm-dd
+    for (const day of days) {
+      // FIX: Ensure the key (YYYY-MM-DD) is generated using India Timezone
+      const dayString = new Intl.DateTimeFormat('en-CA', {
         timeZone: 'Asia/Kolkata',
         year: 'numeric',
         month: '2-digit',
         day: '2-digit'
-      }).format(date);
+      }).format(day); 
 
-    for (const day of days) {
-      // FIX: Use India-specific date string so Dec 23 doesn't become Dec 22
-      const dayString = getIndiaDateString(day); 
       availableSlotsByDay[dayString] = [];
 
       const availabilityStart = new Date(availability.startTime);
       const availabilityEnd = new Date(availability.endTime);
 
-      // FIX: Ensure day/month/year are extracted from the "day" in IST
+      // FIX: Use the 'day' object (which is already IST-based) to set the date
       availabilityStart.setFullYear(day.getFullYear(), day.getMonth(), day.getDate());
       availabilityEnd.setFullYear(day.getFullYear(), day.getMonth(), day.getDate());
 
@@ -91,7 +87,7 @@ export async function getAvailableTimeSlots(doctorId: string) {
       while (isBefore(addMinutes(current, 30), end) || +addMinutes(current, 30) === +end) {
         const next = addMinutes(current, 30);
 
-        // Skip slots that are in the past relative to IST "now"
+        // This check now compares IST current slot vs IST 'now'
         if (isBefore(current, now)) {
           current = next;
           continue;
@@ -108,7 +104,7 @@ export async function getAvailableTimeSlots(doctorId: string) {
             startTime: current.toISOString(),
             endTime: next.toISOString(),
             formatted: `${formatIST(current)} - ${formatIST(next)}`,
-            // Use Intl for the day label to be safe
+            // Display date label using India's calendar
             day: new Intl.DateTimeFormat('en-IN', { 
               timeZone: 'Asia/Kolkata', 
               weekday: 'long', 
@@ -129,7 +125,7 @@ export async function getAvailableTimeSlots(doctorId: string) {
 
     return { days: result };
   } catch (error) {
-    console.error("Failed to fetch available slots:", error);
+    console.error("Failed to fetch slots:", error);
     return { error: "Failed to load slots", days: [] };
   }
 }
