@@ -27,22 +27,18 @@ const getIndiaNow = () => new Date(new Date().toLocaleString("en-US", { timeZone
 export async function getAvailableTimeSlots(doctorId: string) {
   try {
     const doctor = await prisma.user.findUnique({
-      where: {
-        id: doctorId,
-        role: "DOCTOR",
-        verificationStatus: "VERIFIED",
-      },
+      where: { id: doctorId, role: "DOCTOR", verificationStatus: "VERIFIED" },
     });
 
-    if (!doctor) return { error: "Doctor not found or not verified", days: [] };
+    if (!doctor) return { error: "Doctor not found", days: [] };
 
     const availability = await prisma.availability.findFirst({
       where: { doctorId: doctor.id, status: "AVAILABLE" },
     });
 
-    if (!availability) return { error: "No availability set by doctor", days: [] };
+    if (!availability) return { error: "No availability set", days: [] };
 
-    // CHANGE: Use India time instead of server UTC
+    // Use the India timezone helper
     const now = getIndiaNow();
     const days = [now, addDays(now, 1), addDays(now, 2), addDays(now, 3)];
     const lastDay = endOfDay(days[3]);
@@ -56,6 +52,13 @@ export async function getAvailableTimeSlots(doctorId: string) {
     });
 
     const availableSlotsByDay: Record<string, any[]> = {};
+    const formatIST = (date: Date) => 
+      new Intl.DateTimeFormat('en-IN', {
+        timeZone: 'Asia/Kolkata',
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true
+      }).format(date);
 
     for (const day of days) {
       const dayString = format(day, "yyyy-MM-dd");
@@ -64,6 +67,7 @@ export async function getAvailableTimeSlots(doctorId: string) {
       const availabilityStart = new Date(availability.startTime);
       const availabilityEnd = new Date(availability.endTime);
 
+      // Align availability to the current processing day
       availabilityStart.setFullYear(day.getFullYear(), day.getMonth(), day.getDate());
       availabilityEnd.setFullYear(day.getFullYear(), day.getMonth(), day.getDate());
 
@@ -81,23 +85,10 @@ export async function getAvailableTimeSlots(doctorId: string) {
         const overlaps = existingAppointments.some((appointment) => {
           const aStart = new Date(appointment.startTime);
           const aEnd = new Date(appointment.endTime);
-          return (
-            (current >= aStart && current < aEnd) ||
-            (next > aStart && next <= aEnd) ||
-            (current <= aStart && next >= aEnd)
-          );
+          return (current < aEnd && next > aStart); // Simple overlap check
         });
 
         if (!overlaps) {
-          // CHANGE: Use Intl.DateTimeFormat to force IST display
-          const formatIST = (date: Date) => 
-            new Intl.DateTimeFormat('en-IN', {
-              timeZone: 'Asia/Kolkata',
-              hour: 'numeric',
-              minute: '2-digit',
-              hour12: true
-            }).format(date);
-
           availableSlotsByDay[dayString].push({
             startTime: current.toISOString(),
             endTime: next.toISOString(),
