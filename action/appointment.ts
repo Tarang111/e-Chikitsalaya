@@ -38,8 +38,10 @@ export async function getAvailableTimeSlots(doctorId: string) {
 
     if (!availability) return { error: "No availability set", days: [] };
 
-    // Use the India timezone helper
-    const now = getIndiaNow();
+    // 1. Get current time in India
+    const now = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+    
+    // 2. Ensure we start from the beginning of the day in IST for slot generation
     const days = [now, addDays(now, 1), addDays(now, 2), addDays(now, 3)];
     const lastDay = endOfDay(days[3]);
 
@@ -52,6 +54,8 @@ export async function getAvailableTimeSlots(doctorId: string) {
     });
 
     const availableSlotsByDay: Record<string, any[]> = {};
+    
+    // Helper to format time to IST
     const formatIST = (date: Date) => 
       new Intl.DateTimeFormat('en-IN', {
         timeZone: 'Asia/Kolkata',
@@ -60,14 +64,24 @@ export async function getAvailableTimeSlots(doctorId: string) {
         hour12: true
       }).format(date);
 
+    // Helper to get the correct "yyyy-MM-dd" for India
+    const getIndiaDateString = (date: Date) => 
+      new Intl.DateTimeFormat('en-CA', { // en-CA gives yyyy-mm-dd
+        timeZone: 'Asia/Kolkata',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+      }).format(date);
+
     for (const day of days) {
-      const dayString = format(day, "yyyy-MM-dd");
+      // FIX: Use India-specific date string so Dec 23 doesn't become Dec 22
+      const dayString = getIndiaDateString(day); 
       availableSlotsByDay[dayString] = [];
 
       const availabilityStart = new Date(availability.startTime);
       const availabilityEnd = new Date(availability.endTime);
 
-      // Align availability to the current processing day
+      // FIX: Ensure day/month/year are extracted from the "day" in IST
       availabilityStart.setFullYear(day.getFullYear(), day.getMonth(), day.getDate());
       availabilityEnd.setFullYear(day.getFullYear(), day.getMonth(), day.getDate());
 
@@ -77,6 +91,7 @@ export async function getAvailableTimeSlots(doctorId: string) {
       while (isBefore(addMinutes(current, 30), end) || +addMinutes(current, 30) === +end) {
         const next = addMinutes(current, 30);
 
+        // Skip slots that are in the past relative to IST "now"
         if (isBefore(current, now)) {
           current = next;
           continue;
@@ -85,7 +100,7 @@ export async function getAvailableTimeSlots(doctorId: string) {
         const overlaps = existingAppointments.some((appointment) => {
           const aStart = new Date(appointment.startTime);
           const aEnd = new Date(appointment.endTime);
-          return (current < aEnd && next > aStart); // Simple overlap check
+          return (current < aEnd && next > aStart); 
         });
 
         if (!overlaps) {
@@ -93,7 +108,13 @@ export async function getAvailableTimeSlots(doctorId: string) {
             startTime: current.toISOString(),
             endTime: next.toISOString(),
             formatted: `${formatIST(current)} - ${formatIST(next)}`,
-            day: format(current, "EEEE, MMMM d"),
+            // Use Intl for the day label to be safe
+            day: new Intl.DateTimeFormat('en-IN', { 
+              timeZone: 'Asia/Kolkata', 
+              weekday: 'long', 
+              month: 'long', 
+              day: 'numeric' 
+            }).format(current),
           });
         }
         current = next;
@@ -102,7 +123,7 @@ export async function getAvailableTimeSlots(doctorId: string) {
 
     const result = Object.entries(availableSlotsByDay).map(([date, slots]) => ({
       date,
-      displayDate: slots.length > 0 ? slots[0].day : format(new Date(date), "EEEE, MMMM d"),
+      displayDate: slots.length > 0 ? slots[0].day : date,
       slots,
     }));
 
