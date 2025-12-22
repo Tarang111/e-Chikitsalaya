@@ -1,0 +1,166 @@
+// ==========================
+// Prisma Generator
+// ==========================
+generator client {
+  provider = "prisma-client"
+  output   = "../app/generated/prisma"
+}
+
+// ==========================
+// Datasource
+// ==========================
+datasource db {
+  provider = "postgresql"
+}
+
+// ==========================
+// User Model
+// ==========================
+model User {
+  id                String    @id @default(uuid())
+  clerkUserId       String    @unique
+  email             String    @unique
+  name              String?
+  imageUrl          String?
+  role              UserRole  @default(UNASSIGNED)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // Patient
+  credits           Int       @default(2)
+
+  // Doctor
+  specialty         String?
+  experience        Int?
+  credentialUrl     String?
+  description       String?   @db.Text
+  verificationStatus VerificationStatus @default(PENDING)
+
+  // Relations
+  patientAppointments Appointment[] @relation("PatientAppointments")
+  doctorAppointments  Appointment[] @relation("DoctorAppointments")
+  availabilities      Availability[]
+  transactions        CreditTransaction[]
+  payouts             Payout[]
+}
+
+// ==========================
+// Enums
+// ==========================
+enum UserRole {
+  UNASSIGNED
+  PATIENT
+  DOCTOR
+  ADMIN
+}
+
+enum VerificationStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+}
+
+// ==========================
+// ✅ FIXED AVAILABILITY MODEL
+// ==========================
+model Availability {
+  id        String   @id @default(uuid())
+  doctorId  String
+  doctor    User     @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+
+  // ⏰ TIME ONLY (NO TIMEZONE)
+  startTime DateTime  // "15:00"
+  endTime   DateTime   // "18:00"
+
+  status    SlotStatus @default(AVAILABLE)
+
+  @@index([doctorId])
+}
+
+enum SlotStatus {
+  AVAILABLE
+  BOOKED
+  BLOCKED
+}
+
+// ==========================
+// Appointments (DateTime OK)
+// ==========================
+model Appointment {
+  id                 String   @id @default(uuid())
+  patientId          String
+  patient            User     @relation("PatientAppointments", fields: [patientId], references: [id])
+  doctorId           String
+  doctor             User     @relation("DoctorAppointments", fields: [doctorId], references: [id])
+
+  // REAL MOMENT IN TIME
+  startTime          DateTime
+  endTime            DateTime
+
+  status             AppointmentStatus @default(SCHEDULED)
+  notes              String?  @db.Text
+  patientDescription String?  @db.Text
+
+  // Video
+  videoSessionId     String?
+  videoSessionToken  String?
+
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@index([status, startTime])
+  @@index([doctorId, startTime])
+}
+
+enum AppointmentStatus {
+  SCHEDULED
+  COMPLETED
+  CANCELLED
+}
+
+// ==========================
+// Credits
+// ==========================
+model CreditTransaction {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  amount    Int
+  type      TransactionType
+  packageId String?
+  createdAt DateTime @default(now())
+}
+
+enum TransactionType {
+  CREDIT_PURCHASE
+  APPOINTMENT_DEDUCTION
+  ADMIN_ADJUSTMENT
+}
+
+// ==========================
+// Doctor Payouts
+// ==========================
+model Payout {
+  id          String       @id @default(uuid())
+  doctorId    String
+  doctor      User         @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  amount      Float
+  credits     Int
+  platformFee Float
+  netAmount   Float
+  paypalEmail String
+  status      PayoutStatus @default(PROCESSING)
+
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  processedAt DateTime?
+  processedBy String?
+
+  @@index([status, createdAt])
+  @@index([doctorId, status])
+}
+
+enum PayoutStatus {
+  PROCESSING
+  PROCESSED
+}
