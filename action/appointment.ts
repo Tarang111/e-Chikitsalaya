@@ -30,7 +30,7 @@ export async function getAvailableTimeSlots(doctorId: string) {
       where: { id: doctorId, role: "DOCTOR", verificationStatus: "VERIFIED" },
     });
 
-    if (!doctor) return { error: "Doctor not found", days: [] };
+    if (!doctor) return { error: "Doctor not found", days: [] }
 
     const availability = await prisma.availability.findFirst({
       where: { doctorId: doctor.id, status: "AVAILABLE" },
