@@ -8,7 +8,6 @@ import { Auth } from "@vonage/auth";
 import { Vonage } from "@vonage/server-sdk";
 import { deductCreditsForAppointment, refundCreditsForAppointment } from "./credit";
 
-
 // Helper to handle newlines in private keys stored in .env variables
 const privateKey = process.env.VONAGE_PRIVATE_KEY
   ? process.env.VONAGE_PRIVATE_KEY.replace(/\\n/g, "\n")
@@ -21,6 +20,9 @@ const credentials = new Auth({
 
 const vonage = new Vonage(credentials);
 
+// --- HELPER: Get current time in India ---
+const getIndiaNow = () => new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+
 // --- 1. Get Available Time Slots ---
 export async function getAvailableTimeSlots(doctorId: string) {
   try {
@@ -32,15 +34,16 @@ export async function getAvailableTimeSlots(doctorId: string) {
       },
     });
 
-    if (!doctor) return { error: "Doctor not found or not verified",days:[] };
+    if (!doctor) return { error: "Doctor not found or not verified", days: [] };
 
     const availability = await prisma.availability.findFirst({
       where: { doctorId: doctor.id, status: "AVAILABLE" },
     });
 
-    if (!availability) return { error: "No availability set by doctor",days:[] };
+    if (!availability) return { error: "No availability set by doctor", days: [] };
 
-    const now = new Date();
+    // CHANGE: Use India time instead of server UTC
+    const now = getIndiaNow();
     const days = [now, addDays(now, 1), addDays(now, 2), addDays(now, 3)];
     const lastDay = endOfDay(days[3]);
 
@@ -58,7 +61,6 @@ export async function getAvailableTimeSlots(doctorId: string) {
       const dayString = format(day, "yyyy-MM-dd");
       availableSlotsByDay[dayString] = [];
 
-      // Construct start/end times for the specific day based on availability
       const availabilityStart = new Date(availability.startTime);
       const availabilityEnd = new Date(availability.endTime);
 
@@ -71,13 +73,11 @@ export async function getAvailableTimeSlots(doctorId: string) {
       while (isBefore(addMinutes(current, 30), end) || +addMinutes(current, 30) === +end) {
         const next = addMinutes(current, 30);
 
-        // Skip past slots
         if (isBefore(current, now)) {
           current = next;
           continue;
         }
 
-        // Check overlaps
         const overlaps = existingAppointments.some((appointment) => {
           const aStart = new Date(appointment.startTime);
           const aEnd = new Date(appointment.endTime);
@@ -89,10 +89,19 @@ export async function getAvailableTimeSlots(doctorId: string) {
         });
 
         if (!overlaps) {
+          // CHANGE: Use Intl.DateTimeFormat to force IST display
+          const formatIST = (date: Date) => 
+            new Intl.DateTimeFormat('en-IN', {
+              timeZone: 'Asia/Kolkata',
+              hour: 'numeric',
+              minute: '2-digit',
+              hour12: true
+            }).format(date);
+
           availableSlotsByDay[dayString].push({
             startTime: current.toISOString(),
             endTime: next.toISOString(),
-            formatted: `${format(current, "h:mm a")} - ${format(next, "h:mm a")}`,
+            formatted: `${formatIST(current)} - ${formatIST(next)}`,
             day: format(current, "EEEE, MMMM d"),
           });
         }
@@ -109,7 +118,7 @@ export async function getAvailableTimeSlots(doctorId: string) {
     return { days: result };
   } catch (error) {
     console.error("Failed to fetch available slots:", error);
-    return { error: "Failed to load slots" ,days:[]};
+    return { error: "Failed to load slots", days: [] };
   }
 }
 
@@ -144,7 +153,6 @@ export async function bookAppointment(formData: FormData) {
       return { success: false, error: "Insufficient credits (2 required)" };
     }
 
-    // Check for overlaps (DB Check)
     const overlappingAppointment = await prisma.appointment.findFirst({
       where: {
         doctorId: doctorId,
@@ -161,7 +169,6 @@ export async function bookAppointment(formData: FormData) {
       return { success: false, error: "Time slot already booked" };
     }
 
-    // Create Vonage Session
     const sessionId = await createVideoSession();
     
     if (!sessionId) return { success: false, error: "Failed to create video session" };
@@ -175,7 +182,6 @@ export async function bookAppointment(formData: FormData) {
       throw new Error(error || "Failed to deduct credits");
     }
 
-    // Create the appointment with the video session ID
     const appointment = await prisma.appointment.create({
       data: {
         patientId: patient.id,
@@ -184,7 +190,7 @@ export async function bookAppointment(formData: FormData) {
         endTime,
         patientDescription,
         status: "SCHEDULED",
-        videoSessionId: sessionId, // Store the Vonage session ID
+        videoSessionId: sessionId,
       },
     });
 
@@ -193,7 +199,7 @@ export async function bookAppointment(formData: FormData) {
 
   } catch (error) {
     console.error("Failed to book appointment:", error);
-    return { success: false,error:"failed" };
+    return { success: false, error: "failed" };
   }
 }
 
@@ -201,7 +207,6 @@ export async function bookAppointment(formData: FormData) {
 async function createVideoSession() {
   try {
     const session = await vonage.video.createSession({ 
-      // FIX: Cast string to 'any' to bypass strict Enum check
       mediaMode: "routed" as any 
     });
 
@@ -216,81 +221,66 @@ async function createVideoSession() {
   }
 }
 
-export async function deleteAppointment(formdata:FormData) {
-      const {userId}=await auth()
-      if(!userId)
-      {
-        throw new Error("Unauthorized user")
-      }
+export async function deleteAppointment(formdata: FormData) {
+  const { userId } = await auth();
+  if (!userId) throw new Error("Unauthorized user");
+
   try {
-    const appointmentid=formdata.get("appointmentid") as string
-      const notes=formdata.get("notes") as string
-       const doctor=await prisma.user.findUnique({
-        where:{clerkUserId:userId,role:"DOCTOR",verificationStatus:"VERIFIED"}
-       })
-       if(!doctor)
-       {
-        throw new Error("Doctor Not found")
-       }
-       const appointment=await prisma.appointment.findUnique({
-        where:{id:appointmentid,doctorId:doctor.id,status:"SCHEDULED"}
-       })
-       if(!appointment)
-       {
-        throw new Error("Appointment Not found")
-       }
-       const {success,error}=await refundCreditsForAppointment(appointment.patientId,appointment.doctorId)
-       if (!success) {
-      throw new Error(error || "Failed to refund credits");
-    }
-        const appointment1=await prisma.appointment.update({
-        where:{id:appointmentid},
-        data:{status:"CANCELLED",notes:notes}
-       })
-        revalidatePath("/doctor")
-       return {success:true}
+    const appointmentid = formdata.get("appointmentid") as string;
+    const notes = formdata.get("notes") as string;
+    const doctor = await prisma.user.findUnique({
+      where: { clerkUserId: userId, role: "DOCTOR", verificationStatus: "VERIFIED" }
+    });
+    if (!doctor) throw new Error("Doctor Not found");
+
+    const appointment = await prisma.appointment.findUnique({
+      where: { id: appointmentid, doctorId: doctor.id, status: "SCHEDULED" }
+    });
+    if (!appointment) throw new Error("Appointment Not found");
+
+    const { success, error } = await refundCreditsForAppointment(appointment.patientId, appointment.doctorId);
+    if (!success) throw new Error(error || "Failed to refund credits");
+
+    await prisma.appointment.update({
+      where: { id: appointmentid },
+      data: { status: "CANCELLED", notes: notes }
+    });
+    revalidatePath("/doctor");
+    return { success: true };
   } catch (error) {
-    return {success:false,error:"Try agin later"}
-  }
-}
-export async function markDoneAppointment(formdata:FormData) {
-      const {userId}=await auth()
-      if(!userId)
-      {
-        throw new Error("Unauthorized user")
-      }
-  try {
-      const appointmentid=formdata.get("appointmentid") as string
-      const notes=formdata.get("notes") as string
-       const doctor=await prisma.user.findUnique({
-        where:{clerkUserId:userId,role:"DOCTOR",verificationStatus:"VERIFIED"}
-       })
-       if(!doctor)
-       {
-        throw new Error("Doctor Not found")
-       }
-       const appointment=await prisma.appointment.findUnique({
-        where:{id:appointmentid,doctorId:doctor.id,status:"SCHEDULED"}
-       })
-       if(!appointment)
-       {
-        throw new Error("Appointment Not found")
-       }
-  
-        const appointment1=await prisma.appointment.update({
-        where:{id:appointmentid},
-        data:{status:"COMPLETED",notes:notes}
-       })
-        revalidatePath("/doctor")
-       return {success:true}
-  } catch (error) {
-    return {success:false,error:"Try again later"}
+    return { success: false, error: "Try agin later" };
   }
 }
 
+export async function markDoneAppointment(formdata: FormData) {
+  const { userId } = await auth();
+  if (!userId) throw new Error("Unauthorized user");
 
-// --- 4. Generate Video Token (Required for Frontend) ---
-// This function allows the user to JOIN the call
+  try {
+    const appointmentid = formdata.get("appointmentid") as string;
+    const notes = formdata.get("notes") as string;
+    const doctor = await prisma.user.findUnique({
+      where: { clerkUserId: userId, role: "DOCTOR", verificationStatus: "VERIFIED" }
+    });
+    if (!doctor) throw new Error("Doctor Not found");
+
+    const appointment = await prisma.appointment.findUnique({
+      where: { id: appointmentid, doctorId: doctor.id, status: "SCHEDULED" }
+    });
+    if (!appointment) throw new Error("Appointment Not found");
+
+    await prisma.appointment.update({
+      where: { id: appointmentid },
+      data: { status: "COMPLETED", notes: notes }
+    });
+    revalidatePath("/doctor");
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: "Try again later" };
+  }
+}
+
+// --- 4. Generate Video Token ---
 export async function generateVideoToken(appointmentId: string) {
   const { userId } = await auth();
   if (!userId) return { success: false, error: "Unauthorized" };
@@ -308,48 +298,39 @@ export async function generateVideoToken(appointmentId: string) {
 
     if (!appointment) return { success: false, error: "Appointment not found" };
 
-    // Security: Only allow the specific Doctor or Patient to generate a token
     if (appointment.doctorId !== user.id && appointment.patientId !== user.id) {
       return { success: false, error: "Not authorized for this call" };
     }
 
-    // Time Check: Only allow joining 30 mins before start time
-    const now = new Date();
+    // CHANGE: Compare with India time
+    const now = getIndiaNow();
     const appointmentTime = new Date(appointment.startTime);
     const timeDifference = (appointmentTime.getTime() - now.getTime()) / (1000 * 60);
 
-    // Note: Adjust this logic if you want to allow them to join ANY time after creation
     if (timeDifference > 30) {
-       return { success: false, error: "Call available 30 mins before scheduled time" };
+      return { success: false, error: "Call available 30 mins before scheduled time" };
     }
 
-    // Connection Data (stored in the token, visible to other participants)
     const connectionData = JSON.stringify({
       name: user.name,
       role: user.role,
       userId: user.id,
     });
 
-    // Token Expiration (1 hour after appointment ends)
     const appointmentEndTime = new Date(appointment.endTime);
     const expirationTime = Math.floor(appointmentEndTime.getTime() / 1000) + 3600;
     
-    // Ensure expiration is within Vonage limits (max 30 days from now)
     const nowUnix = Math.floor(Date.now() / 1000);
-    if(expirationTime < nowUnix) {
-        return { success: false, error: "Appointment has already ended" };
+    if (expirationTime < nowUnix) {
+      return { success: false, error: "Appointment has already ended" };
     }
 
-    // Generate Token
-    const token = vonage.video.generateClientToken(appointment?.videoSessionId||"", {
-      role: "publisher", // Both can publish video/audio
+    const token = vonage.video.generateClientToken(appointment?.videoSessionId || "", {
+      role: "publisher",
       expireTime: expirationTime,
       data: connectionData,
     });
 
-    // Optional: Save token to DB if you want to reuse it, 
-    // though generating a fresh one on join request is usually safer/stateless.
-    
     return {
       success: true,
       videoSessionId: appointment.videoSessionId,
