@@ -135,12 +135,17 @@ export async function bookAppointment(formData: FormData) {
     if (!patient) return { success: false, error: "Patient not found" };
 
     const doctorId = formData.get("doctorId") as string;
-    const startTime = new Date(formData.get("startTime") as string);
-    const endTime = new Date(formData.get("endTime") as string);
+    
+    // Ensure we parse the string correctly
+    const startStr = formData.get("startTime") as string;
+    const endStr = formData.get("endTime") as string;
+    
+    const startTime = new Date(startStr);
+    const endTime = new Date(endStr);
     const patientDescription = formData.get("description") as string;
 
-    if (!doctorId || !startTime || !endTime) {
-      return { success: false, error: "Missing required fields" };
+    if (!doctorId || isNaN(startTime.getTime()) || isNaN(endTime.getTime())) {
+      return { success: false, error: "Missing or invalid date fields" };
     }
 
     const doctor = await prisma.user.findUnique({
@@ -153,6 +158,7 @@ export async function bookAppointment(formData: FormData) {
       return { success: false, error: "Insufficient credits (2 required)" };
     }
 
+    // Check for overlaps
     const overlappingAppointment = await prisma.appointment.findFirst({
       where: {
         doctorId: doctorId,
@@ -166,20 +172,21 @@ export async function bookAppointment(formData: FormData) {
     });
 
     if (overlappingAppointment) {
-      return { success: false, error: "Time slot already booked" };
+      return { success: false, error: "This time slot has already been booked" };
     }
 
     const sessionId = await createVideoSession();
     
     if (!sessionId) return { success: false, error: "Failed to create video session" };
 
-    const { success, error } = await deductCreditsForAppointment(
+    const { success, error: creditError } = await deductCreditsForAppointment(
       patient.id,
       doctor.id
     );
 
     if (!success) {
-      throw new Error(error || "Failed to deduct credits");
+      // Return the specific credit error instead of generic "failed"
+      return { success: false, error: creditError || "Credit deduction failed" };
     }
 
     const appointment = await prisma.appointment.create({
@@ -197,9 +204,10 @@ export async function bookAppointment(formData: FormData) {
     revalidatePath(`/doctors/${doctor.specialty}/${doctor.id}`);
     return { success: true, appointment };
 
-  } catch (error) {
-    console.error("Failed to book appointment:", error);
-    return { success: false, error: "failed" };
+  } catch (error: any) {
+    // Log the actual error to your Vercel/Terminal console
+    console.error("DETAILED BOOKING ERROR:", error);
+    return { success: false, error: error.message || "An unexpected error occurred" };
   }
 }
 
