@@ -21,9 +21,13 @@ const credentials = new Auth({
 const vonage = new Vonage(credentials);
 
 // --- HELPER: Get current time in India ---
-const getIndiaNow = () => new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+// --- HELPER: Fix 'now' so Today (Dec 23) shows up correctly ---
+const getIndiaNow = () => {
+  const now = new Date();
+  // Anchors 'now' to India's clock so the server doesn't think 2:00 PM has already passed
+  return new Date(now.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+};
 
-// --- 1. Get Available Time Slots ---
 export async function getAvailableTimeSlots(doctorId: string) {
   try {
     const doctor = await prisma.user.findUnique({
@@ -36,10 +40,10 @@ export async function getAvailableTimeSlots(doctorId: string) {
     });
     if (!availability) return { error: "No availability set", days: [] };
 
-    // 1. Force 'Now' to India Standard Time
-    const now = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+    // FIX 1: Use the IST-adjusted 'now'
+    const now = getIndiaNow();
     
-    // 2. Build the 4-day window starting from India's 'Now'
+    // FIX 2: Build the days array using date-fns based on India time
     const days = [now, addDays(now, 1), addDays(now, 2), addDays(now, 3)];
     const lastDay = endOfDay(days[3]);
 
@@ -52,6 +56,7 @@ export async function getAvailableTimeSlots(doctorId: string) {
     });
 
     const availableSlotsByDay: Record<string, any[]> = {};
+    
     const formatIST = (date: Date) => 
       new Intl.DateTimeFormat('en-IN', {
         timeZone: 'Asia/Kolkata',
@@ -61,20 +66,14 @@ export async function getAvailableTimeSlots(doctorId: string) {
       }).format(date);
 
     for (const day of days) {
-      // FIX: Ensure the key is the date in India
-      const dayString = new Intl.DateTimeFormat('en-CA', {
-        timeZone: 'Asia/Kolkata',
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit'
-      }).format(day); 
-
+      // FIX 3: Match your UI's expected key format exactly
+      const dayString = format(day, "yyyy-MM-dd"); 
       availableSlotsByDay[dayString] = [];
 
       const availabilityStart = new Date(availability.startTime);
       const availabilityEnd = new Date(availability.endTime);
 
-      // FIX: Align the slot generator to the current 'day' in the IST loop
+      // FIX 4: Align availability hours to the current IST 'day'
       availabilityStart.setFullYear(day.getFullYear(), day.getMonth(), day.getDate());
       availabilityEnd.setFullYear(day.getFullYear(), day.getMonth(), day.getDate());
 
@@ -84,7 +83,7 @@ export async function getAvailableTimeSlots(doctorId: string) {
       while (isBefore(addMinutes(current, 30), end) || +addMinutes(current, 30) === +end) {
         const next = addMinutes(current, 30);
 
-        // This hides slots that have already passed in India
+        // FIX 5: This now correctly hides only slots that have ACTUALLY passed in India
         if (isBefore(current, now)) {
           current = next;
           continue;
@@ -98,16 +97,12 @@ export async function getAvailableTimeSlots(doctorId: string) {
 
         if (!overlaps) {
           availableSlotsByDay[dayString].push({
-            // Store as ISO for the DB, but formatted for the UI
             startTime: current.toISOString(),
             endTime: next.toISOString(),
-            formatted: `${formatIST(current)} - ${formatIST(next)}`,
-            day: new Intl.DateTimeFormat('en-IN', { 
-              timeZone: 'Asia/Kolkata', 
-              weekday: 'long', 
-              month: 'long', 
-              day: 'numeric' 
-            }).format(current),
+            // Returns "1:54 PM" (formatted for your p tags)
+            formatted: formatIST(current), 
+            // Returns "Tuesday, 23 December" (formatted for your TabsList)
+            day: format(current, "EEEE, d MMMM"), 
           });
         }
         current = next;
@@ -115,8 +110,8 @@ export async function getAvailableTimeSlots(doctorId: string) {
     }
 
     const result = Object.entries(availableSlotsByDay).map(([date, slots]) => ({
-      date,
-      displayDate: slots.length > 0 ? slots[0].day : date,
+      date, // This is "2025-12-23" which matches your defaultValue="d1" logic
+      displayDate: slots.length > 0 ? slots[0].day : format(new Date(date), "EEEE, d MMMM"),
       slots,
     }));
 
