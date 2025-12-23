@@ -151,52 +151,54 @@ async function bookslot(active:any) {
                 <p>Check availability by clicking the book appointment button.</p>
               </div>
 
-              {togglebook && (
-                <div className="w-full mt-6 flex flex-col gap-10">
-                  <Tabs defaultValue='d1'>
-                    <TabsList className='flex md:flex-row flex-col border justify-between h-fit w-full'>
-                      <TabsTrigger value='d1' className='w-full'>{slots[0]?.date}</TabsTrigger>
-                      <TabsTrigger value='d2' className='w-full'>{slots[1]?.date}</TabsTrigger>
-                      <TabsTrigger value='d3' className='w-full'>{slots[2]?.date}</TabsTrigger>
-                      <TabsTrigger value='d4' className='w-full'>{slots[3]?.date}</TabsTrigger>
-                    </TabsList>
+            // Inside your return statement, find the Tabs section:
 
-                    {[0, 1, 2, 3].map((day) => (
-                      <TabsContent key={day} value={`d${day + 1}`}>
-                        <div className="w-full flex flex-wrap gap-2 md:mt-0 ">
-                          {slots[day]?.slots.map((item: any, i: number) => (
-                            <p
-                              key={i}
-                              onClick={() => setactive({day, index:i,  item })}
-                              className={`border w-[170px] cursor-pointer h-[90px] rounded-lg p-3 text-[18px] flex items-center gap-1
-                                ${
-                                  active?.day === day && active?.index === i
-                                    ? "border-[#0A4D68]"
-                                    : ""
-                                }`}
-                            >
-                              <Clock className='w-5 h-5' />
-                              {item.formatted.toString().slice(0, 4)}
-                            </p>
-                          ))}
-                        </div>
-                      </TabsContent>
-                    ))}
-                  </Tabs>
+{togglebook && (
+  <div className="w-full mt-6 flex flex-col gap-10">
+    <Tabs defaultValue='d1'>
+      <TabsList className='flex md:flex-row flex-col border justify-between h-fit w-full'>
+        {slots.map((daySlot, index) => (
+          <TabsTrigger key={index} value={`d${index + 1}`} className='w-full'>
+            {/* Display "Tue, Dec 23" properly */}
+            {daySlot.displayDate}
+          </TabsTrigger>
+        ))}
+      </TabsList>
 
-                  <div className="w-full flex justify-end">
-                    <DialogTrigger asChild>
-                      <Button
-                        disabled={!active}
-                        className='md:w-[280px] w-[95%] md:mx-0 mx-auto bg-[#0a4d68] text-white'
-                        onClick={() => setOpen(true)}
-                      >
-                        Continue
-                      </Button>
-                    </DialogTrigger>
-                  </div>
-                </div>
-              )}
+      {[0, 1, 2, 3].map((dayIndex) => (
+        <TabsContent key={dayIndex} value={`d${dayIndex + 1}`}>
+          <div className="w-full flex flex-wrap gap-2 md:mt-0 ">
+            {slots[dayIndex]?.slots.map((item: any, i: number) => (
+              <p
+                key={i}
+                onClick={() => setactive({ day: dayIndex, index: i, item })}
+                className={`border w-[170px] cursor-pointer h-[90px] rounded-lg p-3 text-[18px] flex items-center gap-1
+                  ${active?.day === dayIndex && active?.index === i
+                    ? "border-[#0A4D68] bg-[#0A4D68]/10"
+                    : "hover:bg-accent"
+                  }`}
+              >
+                <Clock className='w-5 h-5' />
+                {/* FIX: Removed .slice(0,4) to show full time like "7:24 PM" */}
+                {item.formatted}
+              </p>
+            ))}
+          </div>
+        </TabsContent>
+      ))}
+    </Tabs>
+
+    <div className="w-full flex justify-end">
+        <Button
+          disabled={!active}
+          className='md:w-[280px] w-[95%] md:mx-0 mx-auto bg-[#0a4d68] text-white'
+          onClick={() => setOpen(true)}
+        >
+          Continue
+        </Button>
+    </div>
+  </div>
+)}
             </CardContent>
           </Card>
 
