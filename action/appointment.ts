@@ -29,19 +29,17 @@ export async function getAvailableTimeSlots(doctorId: string) {
     const doctor = await prisma.user.findUnique({
       where: { id: doctorId, role: "DOCTOR", verificationStatus: "VERIFIED" },
     });
-
-    if (!doctor) return { error: "Doctor not found", days: [] }
+    if (!doctor) return { error: "Doctor not found", days: [] };
 
     const availability = await prisma.availability.findFirst({
       where: { doctorId: doctor.id, status: "AVAILABLE" },
     });
-
     if (!availability) return { error: "No availability set", days: [] };
 
-    // 1. Force "Now" to India Time
-    const now = getIndiaNow();
+    // 1. Force 'Now' to India Standard Time
+    const now = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
     
-    // 2. Generate days based on India's current date, not server date
+    // 2. Build the 4-day window starting from India's 'Now'
     const days = [now, addDays(now, 1), addDays(now, 2), addDays(now, 3)];
     const lastDay = endOfDay(days[3]);
 
@@ -54,7 +52,6 @@ export async function getAvailableTimeSlots(doctorId: string) {
     });
 
     const availableSlotsByDay: Record<string, any[]> = {};
-    
     const formatIST = (date: Date) => 
       new Intl.DateTimeFormat('en-IN', {
         timeZone: 'Asia/Kolkata',
@@ -64,7 +61,7 @@ export async function getAvailableTimeSlots(doctorId: string) {
       }).format(date);
 
     for (const day of days) {
-      // CHANGE: Use India-specific date string for the key
+      // FIX: Ensure the key is the date in India
       const dayString = new Intl.DateTimeFormat('en-CA', {
         timeZone: 'Asia/Kolkata',
         year: 'numeric',
@@ -77,7 +74,7 @@ export async function getAvailableTimeSlots(doctorId: string) {
       const availabilityStart = new Date(availability.startTime);
       const availabilityEnd = new Date(availability.endTime);
 
-      // CHANGE: Ensure day/month/year align to India calendar
+      // FIX: Align the slot generator to the current 'day' in the IST loop
       availabilityStart.setFullYear(day.getFullYear(), day.getMonth(), day.getDate());
       availabilityEnd.setFullYear(day.getFullYear(), day.getMonth(), day.getDate());
 
@@ -87,7 +84,7 @@ export async function getAvailableTimeSlots(doctorId: string) {
       while (isBefore(addMinutes(current, 30), end) || +addMinutes(current, 30) === +end) {
         const next = addMinutes(current, 30);
 
-        // This check compares IST current slot vs IST 'now'
+        // This hides slots that have already passed in India
         if (isBefore(current, now)) {
           current = next;
           continue;
@@ -96,12 +93,12 @@ export async function getAvailableTimeSlots(doctorId: string) {
         const overlaps = existingAppointments.some((appointment) => {
           const aStart = new Date(appointment.startTime);
           const aEnd = new Date(appointment.endTime);
-          // Standard overlap logic
           return (current < aEnd && next > aStart); 
         });
 
         if (!overlaps) {
           availableSlotsByDay[dayString].push({
+            // Store as ISO for the DB, but formatted for the UI
             startTime: current.toISOString(),
             endTime: next.toISOString(),
             formatted: `${formatIST(current)} - ${formatIST(next)}`,
