@@ -2,6 +2,9 @@
 import prisma from "@/lib/prisma";
 import { auth } from "@clerk/nextjs/server";
 
+// --- HELPER: Get current time in India (Useful if you add future filtering) ---
+const getIndiaNow = () => new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+
 export async function getAppointentofpatient() {
     const {userId}=await auth()
     if(!userId) throw new Error("Unauthorized User");
