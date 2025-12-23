@@ -139,57 +139,50 @@ function Profileview() {
                 <p className="text-sm text-muted-foreground">Select a preferred time slot below.</p>
               </div>
 
-              {togglebook && (
-                <div className="w-full mt-6 flex flex-col gap-8">
-                  <Tabs defaultValue="d0">
-                    <TabsList className='flex md:flex-row flex-col border justify-between h-auto w-full p-1 bg-muted'>
-                      {slots.map((daySlot, index) => (
-                        <TabsTrigger key={index} value={`d${index}`} className='w-full py-2'>
-                          {/* Uses formatted displayDate from server (e.g. "Tuesday, Dec 23") */}
-                          {daySlot.displayDate}
-                        </TabsTrigger>
-                      ))}
-                    </TabsList>
+          {togglebook && (
+  <div className="w-full mt-6 flex flex-col gap-10">
+    <Tabs defaultValue='d1'>
+      <TabsList className='flex md:flex-row flex-col border justify-between h-fit w-full'>
+        {/* Restores original date tabs */}
+        <TabsTrigger value='d1' className='w-full'>{slots[0]?.date}</TabsTrigger>
+        <TabsTrigger value='d2' className='w-full'>{slots[1]?.date}</TabsTrigger>
+        <TabsTrigger value='d3' className='w-full'>{slots[2]?.date}</TabsTrigger>
+        <TabsTrigger value='d4' className='w-full'>{slots[3]?.date}</TabsTrigger>
+      </TabsList>
 
-                    {slots.map((dayData, dayIndex) => (
-                      <TabsContent key={dayIndex} value={`d${dayIndex}`}>
-                        <div className="w-full flex flex-wrap gap-3 mt-4">
-                          {dayData.slots.length > 0 ? (
-                            dayData.slots.map((item: any, i: number) => (
-                              <button
-                                key={i}
-                                onClick={() => setactive({ day: dayIndex, index: i, item })}
-                                className={`border min-w-[140px] flex-1 md:flex-none cursor-pointer rounded-xl p-4 transition-all
-                                  ${active?.day === dayIndex && active?.index === i
-                                    ? "border-[#0A4D68] bg-[#0A4D68] text-white shadow-md"
-                                    : "hover:border-[#0A4D68] hover:bg-slate-50"
-                                  }`}
-                              >
-                                <div className="flex items-center justify-center gap-2">
-                                  <Clock className={`w-4 h-4 ${active?.day === dayIndex && active?.index === i ? "text-white" : "text-[#0A4D68]"}`} />
-                                  <span className="font-medium">{item.formatted}</span>
-                                </div>
-                              </button>
-                            ))
-                          ) : (
-                            <p className="text-muted-foreground text-sm italic p-4">No slots available for this day.</p>
-                          )}
-                        </div>
-                      </TabsContent>
-                    ))}
-                  </Tabs>
+      {[0, 1, 2, 3].map((day) => (
+        <TabsContent key={day} value={`d${day + 1}`}>
+          <div className="w-full flex flex-wrap gap-2 md:mt-0 ">
+            {slots[day]?.slots.map((item: any, i: number) => (
+              <p
+                key={i}
+                onClick={() => setactive({ day, index: i, item })}
+                className={`border w-[170px] cursor-pointer h-[90px] rounded-lg p-3 text-[18px] flex items-center gap-1
+                  ${active?.day === day && active?.index === i ? "border-[#0A4D68]" : ""}`}
+              >
+                <Clock className='w-5 h-5' />
+                {/* Restores your original slice logic if that's what you prefer */}
+                {item.formatted.toString()}
+              </p>
+            ))}
+          </div>
+        </TabsContent>
+      ))}
+    </Tabs>
 
-                  <div className="w-full flex justify-end">
-                    <Button
-                      disabled={!active}
-                      className='md:w-[280px] w-full bg-[#0a4d68] text-white h-12 text-lg font-semibold'
-                      onClick={() => setOpen(true)}
-                    >
-                      Continue
-                    </Button>
-                  </div>
-                </div>
-              )}
+    <div className="w-full flex justify-end">
+      <DialogTrigger asChild>
+        <Button
+          disabled={!active}
+          className='md:w-[280px] w-[95%] md:mx-0 mx-auto bg-[#0a4d68] text-white'
+          onClick={() => setOpen(true)}
+        >
+          Continue
+        </Button>
+      </DialogTrigger>
+    </div>
+  </div>
+)}
             </CardContent>
           </Card>
 
