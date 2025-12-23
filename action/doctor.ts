@@ -3,6 +3,9 @@ import prisma from "@/lib/prisma";
 import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
 
+// --- HELPER: Get current time in India ---
+const getIndiaNow = () => new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+
 export async function specialtydoctors(specialty:string) {
     try {
         const doctors=await prisma.user.findMany({
@@ -23,9 +26,8 @@ export async function specialtydoctors(specialty:string) {
         })
         return {doctorlist:doctors}
     } catch (error) {
+        console.log(error);
         return {doctorlist:[]}
-         console.log(error);
-         
     }
 }
 
@@ -150,6 +152,10 @@ export async function getDoctorProfile(id:string) {
                 createdAt:true,
                 email:true,
                   availabilities:{
+                    where: {
+                        // CHANGE: Filter out old slots based on India Time
+                        startTime: { gte: getIndiaNow() } 
+                    },
                     select:{
                         startTime:true,
                         endTime:true,
