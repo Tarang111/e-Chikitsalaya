@@ -156,7 +156,7 @@ function Profileview() {
                 <div className="w-full mt-6 flex flex-col gap-10">
                   <Tabs defaultValue='d1'>
                     <TabsList className='flex md:flex-row flex-col border justify-between h-fit w-full'>
-                      <TabsTrigger value='d1' className='w-full'>{slots[0]?.date}</TabsTrigger>
+                      <TabsTrigger value='d2' className='w-full'>{slots[0]?.date}</TabsTrigger>
                       <TabsTrigger value='d2' className='w-full'>{slots[1]?.date}</TabsTrigger>
                       <TabsTrigger value='d3' className='w-full'>{slots[2]?.date}</TabsTrigger>
                       <TabsTrigger value='d4' className='w-full'>{slots[3]?.date}</TabsTrigger>
