@@ -22,9 +22,7 @@ function Profileview() {
   const [data, setdata] = useState<any[]>([])
   const [slots, setslots] = useState<any[]>([])
   const router = useRouter()
-  // 🔴 FIX: store selected day + slot
   const [active, setactive] = useState<{ day: number, index: number, item: any } | null>(null)
-
   const [togglebook, settogglebook] = useState(false)
 
   if (!id) {
@@ -39,11 +37,8 @@ function Profileview() {
     try {
       const res = await getDoctorProfile(id)
       const slotres = await getAvailableTimeSlots(id)
-
       setdata(res.doctors)
       setslots(slotres.days)
-      console.log(slotres);
-
     } catch (error) { }
   }
 
@@ -63,18 +58,12 @@ function Profileview() {
       }
 
       toast("Appointment booked successfully")
-
-      // ✅ CLOSE DIALOG
       setOpen(false)
-
-      // ✅ RESET STATE
       setactive(null)
       settogglebook(false)
       setdescription("")
       setconfirming(false)
-      // ✅ REFRESH DATA
       await getdata(id)
-
     } catch (error) {
       console.log(error)
     }
@@ -95,26 +84,22 @@ function Profileview() {
         />
 
         <div className="flex w-full md:flex-row flex-col gap-2">
-          {/* photocard */}
           <Card className='md:w-[25%] w-full h-fit'>
             <CardContent>
               <div className="w-full justify-center items-center flex gap-5 flex-col">
                 <div className="w-26 h-26 rounded-full object-cover">
                   <img src={data[0]?.imageUrl} className='w-full rounded-full' alt="" />
                 </div>
-
                 <div className="flex flex-col items-center">
                   <p className='font-bold text-xl'>{data[0]?.name}</p>
                   <p className='border bg-[#0A4D68] w-fit text-white p-0.5 rounded-lg'>
                     {data[0]?.specialty}
                   </p>
                 </div>
-
                 <div className="flex gap-1">
                   <BadgeCheck />
                   <p className='font-light'>{data[0]?.experience} years experience</p>
                 </div>
-
                 <Button
                   className='bg-[#0A4D68] w-full text-white'
                   onClick={() => settogglebook(prev => !prev)}
@@ -132,7 +117,6 @@ function Profileview() {
               </CardTitle>
               <CardDescription>Professional background and expertise.</CardDescription>
             </CardHeader>
-
             <CardContent>
               <div className="flex flex-col gap-3">
                 <div className="flex gap-2 items-center">
@@ -141,9 +125,7 @@ function Profileview() {
                 </div>
                 <p className='text-muted-foreground'>{data[0]?.description}</p>
               </div>
-
               <Separator className='mt-5 mb-5' />
-
               <div className="flex flex-col gap-3">
                 <div className="flex gap-2 items-center">
                   <Clock1 className='w-5 h-5 ' />
@@ -156,7 +138,8 @@ function Profileview() {
                 <div className="w-full mt-6 flex flex-col gap-10">
                   <Tabs defaultValue='d1'>
                     <TabsList className='flex md:flex-row flex-col border justify-between h-fit w-full'>
-                      <TabsTrigger value='d2' className='w-full'>{slots[0]?.date}</TabsTrigger>
+                      {/* FIX: Set correct index triggers for each day */}
+                      <TabsTrigger value='d1' className='w-full'>{slots[0]?.date}</TabsTrigger>
                       <TabsTrigger value='d2' className='w-full'>{slots[1]?.date}</TabsTrigger>
                       <TabsTrigger value='d3' className='w-full'>{slots[2]?.date}</TabsTrigger>
                       <TabsTrigger value='d4' className='w-full'>{slots[3]?.date}</TabsTrigger>
@@ -176,7 +159,7 @@ function Profileview() {
                                 }`}
                             >
                               <Clock className='w-5 h-5' />
-                              {/* Restored your original slice logic */}
+                              {/* Restored slice logic per your request */}
                               {item.formatted.toString().slice(0, 4)}
                             </p>
                           ))}
@@ -201,7 +184,6 @@ function Profileview() {
             </CardContent>
           </Card>
 
-          {/* 🔴 FIX: Proper dialog content */}
           <DialogContent className="h-[50vh] md:min-h-[60vh] min-h-[80vh] w-[60vw] md:min-w-[50vw] min-w-[98%] flex flex-col overflow-y-scroll">
             <DialogHeader>
               <DialogTitle>Book your Appointment...</DialogTitle>
@@ -220,7 +202,6 @@ function Profileview() {
                   <Textarea placeholder='Enter your medical concern..' className='h-[20vh]' onChange={(e) => { setdescription(e.target.value) }}></Textarea>
                   <p className='font-light'>*This information can be shared with your doctor before appointment</p>
                 </div>
-                {/* buttons */}
                 <div className="flex justify-between md:flex-row flex-col md:gap-0 gap-2">
                   <DialogClose asChild ><Button> Change timeslot</Button></DialogClose>
                   <Button onClick={() => { bookslot(active), setconfirming(true) }}>{(confirming) ? "Confirming..." : "Confirm Booking"}</Button>
@@ -234,4 +215,4 @@ function Profileview() {
   )
 }
 
-export default Profileview
+export default Profileview;
