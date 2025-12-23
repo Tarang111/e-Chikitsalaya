@@ -14,64 +14,64 @@ import { useParams, useRouter } from 'next/navigation';
 
 import React, { useEffect, useState } from 'react'
 import { toast } from 'sonner';
+
 export const dynamic = "force-dynamic";
 
 function Profileview() {
-  const { id, specialty } = useParams()
-  const [description, setdescription] = useState("")
-  const [data, setdata] = useState<any[]>([])
-  const [slots, setslots] = useState<any[]>([])
-  const router = useRouter()
-  const [active, setactive] = useState<{ day: number, index: number, item: any } | null>(null)
-  const [togglebook, settogglebook] = useState(false)
+  const { id, specialty } = useParams();
+  const [description, setdescription] = useState("");
+  const [data, setdata] = useState<any[]>([]);
+  const [slots, setslots] = useState<any[]>([]);
+  const router = useRouter();
+  const [active, setactive] = useState<{ day: number, index: number, item: any } | null>(null);
+  const [togglebook, settogglebook] = useState(false);
+  const [open, setOpen] = useState(false);
+  const [confirming, setconfirming] = useState(false);
 
-  if (!id) {
-    return <h1>Not available</h1>
-  }
+  if (!id) return <h1>Not available</h1>;
 
-  const backlabell = specialty?.toString().split("%20").join(" ")
-  const [open, setOpen] = useState(false)
-  const [confirming, setconfirming] = useState(false)
+  const backlabell = specialty?.toString().split("%20").join(" ");
 
   async function getdata(id: any) {
     try {
-      const res = await getDoctorProfile(id)
-      const slotres = await getAvailableTimeSlots(id)
-      setdata(res.doctors)
-      setslots(slotres.days)
-    } catch (error) { }
+      const res = await getDoctorProfile(id);
+      const slotres = await getAvailableTimeSlots(id);
+      setdata(res.doctors);
+      setslots(slotres.days);
+    } catch (error) {
+      console.error(error);
+    }
   }
 
   async function bookslot(active: any) {
     try {
-      const formdata = new FormData()
-      formdata.append("doctorId", id as string)
-      formdata.append("startTime", active.item.startTime)
-      formdata.append("endTime", active.item.endTime)
-      formdata.append("description", description)
+      const formdata = new FormData();
+      formdata.append("doctorId", id as string);
+      formdata.append("startTime", active.item.startTime);
+      formdata.append("endTime", active.item.endTime);
+      formdata.append("description", description);
 
-      const appointment = await bookAppointment(formdata)
-
+      const appointment = await bookAppointment(formdata);
       if (!appointment.success) {
-        toast(appointment.error)
-        return
+        toast(appointment.error);
+        return;
       }
 
-      toast("Appointment booked successfully")
-      setOpen(false)
-      setactive(null)
-      settogglebook(false)
-      setdescription("")
-      setconfirming(false)
-      await getdata(id)
+      toast("Appointment booked successfully");
+      setOpen(false);
+      setactive(null);
+      settogglebook(false);
+      setdescription("");
+      setconfirming(false);
+      await getdata(id);
     } catch (error) {
-      console.log(error)
+      console.log(error);
     }
   }
 
   useEffect(() => {
-    getdata(id)
-  }, [id])
+    getdata(id);
+  }, [id]);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -84,11 +84,12 @@ function Profileview() {
         />
 
         <div className="flex w-full md:flex-row flex-col gap-2">
+          {/* Doctor Info Card */}
           <Card className='md:w-[25%] w-full h-fit'>
             <CardContent>
-              <div className="w-full justify-center items-center flex gap-5 flex-col">
-                <div className="w-26 h-26 rounded-full object-cover">
-                  <img src={data[0]?.imageUrl} className='w-full rounded-full' alt="" />
+              <div className="w-full justify-center items-center flex gap-5 flex-col pt-4">
+                <div className="w-26 h-26 rounded-full object-cover overflow-hidden">
+                  <img src={data[0]?.imageUrl} className='w-full' alt="" />
                 </div>
                 <div className="flex flex-col items-center">
                   <p className='font-bold text-xl'>{data[0]?.name}</p>
@@ -100,37 +101,27 @@ function Profileview() {
                   <BadgeCheck />
                   <p className='font-light'>{data[0]?.experience} years experience</p>
                 </div>
-                <Button
-                  className='bg-[#0A4D68] w-full text-white'
-                  onClick={() => settogglebook(prev => !prev)}
-                >
+                <Button className='bg-[#0A4D68] w-full text-white' onClick={() => settogglebook(prev => !prev)}>
                   Book Appointments
                 </Button>
               </div>
             </CardContent>
           </Card>
 
+          {/* Availability Card */}
           <Card className='md:w-[69%] w-full'>
             <CardHeader>
-              <CardTitle className='text-xl font-bold'>
-                About Dr. {data[0]?.name}
-              </CardTitle>
+              <CardTitle className='text-xl font-bold'>About Dr. {data[0]?.name}</CardTitle>
               <CardDescription>Professional background and expertise.</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="flex flex-col gap-3">
-                <div className="flex gap-2 items-center">
-                  <File className='w-5 h-5 ' />
-                  <p className='font-bold'>Description</p>
-                </div>
+                <div className="flex gap-2 items-center"><File className='w-5 h-5 ' /><p className='font-bold'>Description</p></div>
                 <p className='text-muted-foreground'>{data[0]?.description}</p>
               </div>
               <Separator className='mt-5 mb-5' />
               <div className="flex flex-col gap-3">
-                <div className="flex gap-2 items-center">
-                  <Clock1 className='w-5 h-5 ' />
-                  <p className='font-bold'>Availabilty</p>
-                </div>
+                <div className="flex gap-2 items-center"><Clock1 className='w-5 h-5 ' /><p className='font-bold'>Availabilty</p></div>
                 <p>Check availability by clicking the book appointment button.</p>
               </div>
 
@@ -138,28 +129,41 @@ function Profileview() {
                 <div className="w-full mt-6 flex flex-col gap-10">
                   <Tabs defaultValue='d1'>
                     <TabsList className='flex md:flex-row flex-col border justify-between h-fit w-full'>
-                      {/* FIX: Set correct index triggers for each day */}
                       <TabsTrigger value='d1' className='w-full'>{slots[0]?.date}</TabsTrigger>
                       <TabsTrigger value='d2' className='w-full'>{slots[1]?.date}</TabsTrigger>
                       <TabsTrigger value='d3' className='w-full'>{slots[2]?.date}</TabsTrigger>
                       <TabsTrigger value='d4' className='w-full'>{slots[3]?.date}</TabsTrigger>
                     </TabsList>
 
-                    {[0, 1, 2, 3].map((day) => (
-                      <TabsContent key={day} value={`d${day + 1}`}>
-                        <div className="w-full flex flex-wrap gap-2 md:mt-0 ">
-                          {slots[day]?.slots.map((item: any, i: number) => (
+                    {/* Today Tab - Manually set to show Day 2 slots */}
+                    <TabsContent value="d1">
+                      <div className="w-full flex flex-wrap gap-2 md:mt-0">
+                        {slots[1]?.slots.map((item: any, i: number) => (
+                          <p
+                            key={i}
+                            onClick={() => setactive({ day: 0, index: i, item })}
+                            className={`border w-[170px] cursor-pointer h-[90px] rounded-lg p-3 text-[18px] flex items-center gap-1
+                              ${active?.day === 0 && active?.index === i ? "border-[#0A4D68]" : ""}`}
+                          >
+                            <Clock className='w-5 h-5' />
+                            {item.formatted.toString().slice(0, 4)}
+                          </p>
+                        ))}
+                      </div>
+                    </TabsContent>
+
+                    {/* Other Days - Separate mapping */}
+                    {[1, 2, 3].map((dayIndex) => (
+                      <TabsContent key={dayIndex} value={`d${dayIndex + 1}`}>
+                        <div className="w-full flex flex-wrap gap-2 md:mt-0">
+                          {slots[dayIndex]?.slots.map((item: any, i: number) => (
                             <p
                               key={i}
-                              onClick={() => setactive({ day, index: i, item })}
+                              onClick={() => setactive({ day: dayIndex, index: i, item })}
                               className={`border w-[170px] cursor-pointer h-[90px] rounded-lg p-3 text-[18px] flex items-center gap-1
-                                ${active?.day === day && active?.index === i
-                                  ? "border-[#0A4D68]"
-                                  : ""
-                                }`}
+                                ${active?.day === dayIndex && active?.index === i ? "border-[#0A4D68]" : ""}`}
                             >
                               <Clock className='w-5 h-5' />
-                              {/* Restored slice logic per your request */}
                               {item.formatted.toString().slice(0, 4)}
                             </p>
                           ))}
@@ -170,11 +174,7 @@ function Profileview() {
 
                   <div className="w-full flex justify-end">
                     <DialogTrigger asChild>
-                      <Button
-                        disabled={!active}
-                        className='md:w-[280px] w-[95%] md:mx-0 mx-auto bg-[#0a4d68] text-white'
-                        onClick={() => setOpen(true)}
-                      >
+                      <Button disabled={!active} className='md:w-[280px] w-[95%] md:mx-0 mx-auto bg-[#0a4d68] text-white' onClick={() => setOpen(true)}>
                         Continue
                       </Button>
                     </DialogTrigger>
@@ -192,19 +192,20 @@ function Profileview() {
 
             {active && (
               <div className="flex flex-col gap-5">
-                <div className="">
+                <div>
                   <p className='flex items-center gap-1'><Calendar1 className='w-4 h-4' />Date: {slots[active.day]?.date}</p>
                   <p className='flex items-center gap-1'><Clock1 className='w-4 h-4' />Time: {active.item.formatted}</p>
                   <p className='flex items-center gap-1'><Wallet2 className='w-4 h-4' />Cost : 2 Credits</p>
                 </div>
                 <div className="flex flex-col gap-1">
                   <p className='font-bold'>Describe your medical concern(optional)</p>
-                  <Textarea placeholder='Enter your medical concern..' className='h-[20vh]' onChange={(e) => { setdescription(e.target.value) }}></Textarea>
-                  <p className='font-light'>*This information can be shared with your doctor before appointment</p>
+                  <Textarea placeholder='Enter your medical concern..' className='h-[20vh]' onChange={(e) => setdescription(e.target.value)} />
                 </div>
                 <div className="flex justify-between md:flex-row flex-col md:gap-0 gap-2">
-                  <DialogClose asChild ><Button> Change timeslot</Button></DialogClose>
-                  <Button onClick={() => { bookslot(active), setconfirming(true) }}>{(confirming) ? "Confirming..." : "Confirm Booking"}</Button>
+                  <DialogClose asChild><Button> Change timeslot</Button></DialogClose>
+                  <Button onClick={() => { bookslot(active); setconfirming(true); }}>
+                    {confirming ? "Confirming..." : "Confirm Booking"}
+                  </Button>
                 </div>
               </div>
             )}
@@ -212,7 +213,7 @@ function Profileview() {
         </div>
       </div>
     </Dialog>
-  )
+  );
 }
 
 export default Profileview;
