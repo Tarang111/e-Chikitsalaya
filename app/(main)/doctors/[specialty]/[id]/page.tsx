@@ -43,31 +43,56 @@ function Profileview() {
     }
   }
 
-  async function bookslot(active: any) {
-    try {
-      const formdata = new FormData();
-      formdata.append("doctorId", id as string);
-      formdata.append("startTime", active.item.startTime);
-      formdata.append("endTime", active.item.endTime);
-      formdata.append("description", description);
+ async function bookslot(active: any) {
+  try {
+    setconfirming(true); // Ensure "Confirming..." shows on the button
+    const formdata = new FormData();
+    formdata.append("doctorId", id as string);
+    formdata.append("description", description);
 
-      const appointment = await bookAppointment(formdata);
-      if (!appointment.success) {
-        toast(appointment.error);
-        return;
-      }
+    // 1. Get the timestamps from the slot (which are currently for Day 2)
+    let finalStart = new Date(active.item.startTime);
+    let finalEnd = new Date(active.item.endTime);
 
-      toast("Appointment booked successfully");
-      setOpen(false);
-      setactive(null);
-      settogglebook(false);
-      setdescription("");
-      setconfirming(false);
-      await getdata(id);
-    } catch (error) {
-      console.log(error);
+    // 2. If user is on the first tab (Today), force the date to be Today
+    if (active.day === 0) {
+      // Get today's date in India
+      const today = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+      
+      finalStart.setFullYear(today.getFullYear(), today.getMonth(), today.getDate());
+      finalEnd.setFullYear(today.getFullYear(), today.getMonth(), today.getDate());
     }
+
+    // 3. Append the corrected ISO strings to the form
+    formdata.append("startTime", finalStart.toISOString());
+    formdata.append("endTime", finalEnd.toISOString());
+
+    const appointment = await bookAppointment(formdata);
+
+    if (!appointment.success) {
+      toast(appointment.error);
+      setconfirming(false);
+      return;
+    }
+
+    toast("Appointment booked successfully");
+
+    // ✅ Reset UI States
+    setOpen(false);
+    setactive(null);
+    settogglebook(false);
+    setdescription("");
+    setconfirming(false);
+    
+    // ✅ Refresh availability to show the newly blocked slot
+    await getdata(id);
+
+  } catch (error) {
+    console.error("Booking Error:", error);
+    setconfirming(false);
+    toast("An unexpected error occurred");
   }
+}
 
   useEffect(() => {
     getdata(id);
